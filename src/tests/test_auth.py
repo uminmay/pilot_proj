@@ -1,5 +1,5 @@
 import pytest
-from src.auth.routes import register_user, login_user  # Use absolute import
+from src.auth.routes import auth_bp  # Update import to use blueprint instead of individual functions
 
 @pytest.fixture
 def client():
