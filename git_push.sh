@@ -28,94 +28,48 @@ check_git_config() {
 
 # Function to check if SSH key exists and is added to ssh-agent
 check_ssh() {
-    echo -e "${RED}SSH connectivity failed. Proceeding to key selection or generation...${NC}"
+    echo -e "${YELLOW}Checking for existing SSH keys...${NC}"
     local key_files=($(find ~/.ssh -type f -not -name "*.pub" -not -name "known_hosts" -not -name "config"))
     local num_keys=${#key_files[@]}
     
     if [ $num_keys -gt 0 ]; then
         echo -e "${GREEN}Found existing SSH keys:${NC}"
-        for i in "${!key_files[@]}"; do 
-            echo "[$((i+1))] ${key_files[$i]}"
-        done
+        for i in "${!key_files[@]}"; do echo "[$((i+1))] ${key_files[$i]}"; done
+        read -p "Select key number (or 'n' for new key): " selection
         
-        while true; do
-            read -p "Select key number (or 'n' for new key): " selection
+        if [[ $selection =~ ^[0-9]+$ ]] && [ $selection -le $num_keys ] && [ $selection -gt 0 ]; then
+            selected_key="${key_files[$((selection-1))]}"
+            eval "$(ssh-agent -s)" && ssh-add "$selected_key"
+            return 0
+        elif [[ $selection =~ ^[Nn]$ ]]; then
+            mkdir -p ~/.ssh
+            echo -e "${YELLOW}Generating new SSH key...${NC}"
+            read -p "Enter key name (will be created in ~/.ssh/): " key_name
+            key_name=${key_name:-id_rsa}
+            key_path="$HOME/.ssh/$key_name"
             
-            if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -le "$num_keys" ] && [ "$selection" -gt 0 ]; then
-                selected_key="${key_files[$((selection-1))]}"
-                echo -e "${GREEN}Using key: $selected_key${NC}"
-                eval "$(ssh-agent -s)" && ssh-add "$selected_key"
-                return 0
-            elif [[ "$selection" =~ ^[Nn]$ ]]; then
-                break
-            else
-                echo -e "${RED}Invalid selection. Please enter a number between 1 and $num_keys or 'n' for new key${NC}"
-                continue
+            if [ -f "$key_path" ]; then
+                echo -e "${RED}Key already exists at $key_path${NC}"
+                return 1
             fi
-        done
-    fi
-    
-    # Create new key
-    mkdir -p ~/.ssh
-    echo -e "${YELLOW}Generating new SSH key...${NC}"
-    read -p "Enter key name (will be created in ~/.ssh/, default: id_rsa): " key_name
-    key_name=${key_name:-id_rsa}
-    key_path="$HOME/.ssh/$key_name"
-    
-    if [ -f "$key_path" ]; then
-        echo -e "${RED}Key already exists at $key_path${NC}"
-        return 1
-    fi
-    
-    ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$key_path"
-    eval "$(ssh-agent -s)" && ssh-add "$key_path"
-    echo -e "${GREEN}Add this public key to GitHub:${NC}"
-    cat "${key_path}.pub"
-    read -p "Press enter after adding to GitHub..."
-}
-
-# Function to test connectivity with the remote URL
-test_connectivity() {
-    echo -e "${YELLOW}Testing connectivity with the remote URL...${NC}"
-    git ls-remote &>/dev/null
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Authentication error detected. Proceeding to key selection or generation...${NC}"
-        return 1
-    else
-        echo -e "${GREEN}Connectivity test successful. Proceeding with git operations...${NC}"
-        return 0
-    fi
-}
-
-# Function to handle authentication error
-handle_auth_error() {
-    echo -e "${YELLOW}Do you want to select an existing SSH key or generate a new one? (select/generate)${NC}"
-    read choice
-    if [ "$choice" == "select" ]; then
-        check_ssh
-    elif [ "$choice" == "generate" ]; then
-        mkdir -p ~/.ssh
-        echo -e "${YELLOW}Generating new SSH key...${NC}"
-        read -p "Enter key name (will be created in ~/.ssh/, default: id_rsa): " key_name
-        key_name=${key_name:-id_rsa}
-        key_path="$HOME/.ssh/$key_name"
-        
-        if [ -f "$key_path" ]; then
-            echo -e "${RED}Key already exists at $key_path${NC}"
+            
+            ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$key_path"
+            eval "$(ssh-agent -s)" && ssh-add "$key_path"
+            echo -e "${GREEN}Add this public key to GitHub:${NC}" && cat "${key_path}.pub"
+            read -p "Press enter after adding to GitHub..."
+        else
+            echo -e "${RED}Invalid selection${NC}"
             return 1
         fi
-        
-        ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$key_path"
-        eval "$(ssh-agent -s)" && ssh-add "$key_path"
-        echo -e "${GREEN}Add this public key to GitHub:${NC}"
-        cat "${key_path}.pub"
-        read -p "Press enter after adding to GitHub..."
     else
-        echo -e "${RED}Invalid choice. Exiting.${NC}"
-        exit 1
+        echo -e "${YELLOW}No existing SSH keys found in ~/.ssh${NC}"
+        echo -e "${YELLOW}Generating new SSH key...${NC}"
+        mkdir -p ~/.ssh
+        ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$HOME/.ssh/id_rsa"
+        eval "$(ssh-agent -s)" && ssh-add "$HOME/.ssh/id_rsa"
+        echo -e "${GREEN}Add this public key to GitHub:${NC}" && cat "$HOME/.ssh/id_rsa.pub"
+        read -p "Press enter after adding to GitHub..."
     fi
-    echo -e "${YELLOW}Retrying connectivity test...${NC}"
-    test_connectivity
 }
 
 # Function to check if repository has commits
@@ -151,6 +105,9 @@ check_branch() {
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             git checkout test 2>/dev/null || git checkout -b test
+        else
+            echo -e "${RED}Exiting to avoid pushing to main branch locally.${NC}"
+            exit 1
         fi
     elif [ "$current_branch" = "no branch" ]; then
         git checkout -b test
@@ -175,32 +132,13 @@ get_commit_message() {
     echo "${commit_message:-Update: $(date +%Y-%m-%d_%H-%M-%S)}"
 }
 
-# Function to merge changes into main and push
-merge_to_main() {
-    echo -e "${YELLOW}Checking out main branch...${NC}"
-    git checkout main 2>/dev/null || git checkout -b main
-    echo -e "${GREEN}Merging changes from $(git rev-parse --abbrev-ref HEAD) into main...${NC}"
-    git merge --no-ff -m "Merge changes from $(git rev-parse --abbrev-ref HEAD)" || {
-        echo -e "${RED}Merge conflict detected. Resolve conflicts and push manually.${NC}"
-        exit 1
-    }
-    echo -e "${GREEN}Pushing changes to main branch...${NC}"
-    git push origin main
-}
-
 # Main execution
 echo -e "${GREEN}Starting Git automation...${NC}"
 
 # Initial checks
 command -v git >/dev/null 2>&1 || { echo -e "${RED}Install git first${NC}"; exit 1; }
 check_git_config
-
-# Test connectivity before proceeding
-if test_connectivity; then
-    echo -e "${GREEN}Skipping SSH key check as connectivity is successful.${NC}"
-else
-    check_ssh
-fi
+check_ssh
 
 # Initialize git and check first push
 init_git
@@ -213,8 +151,7 @@ if ! has_commits; then
     echo -e "${YELLOW}Creating initial commit...${NC}"
     git add .
     git commit -m "Initial commit"
-    git push --set-upstream origin $(git rev-parse --abbrev-ref HEAD)
-    merge_to_main
+    git push --set-upstream origin test
     echo -e "${GREEN}Repository initialized successfully!${NC}"
     exit 0
 fi
@@ -231,10 +168,7 @@ commit_message=$(get_commit_message)
 git add .
 git commit -m "$commit_message"
 
-echo -e "${GREEN}Pushing changes to branch $(git rev-parse --abbrev-ref HEAD)...${NC}"
+echo -e "${GREEN}Pushing changes to test branch...${NC}"
 git push origin $(git rev-parse --abbrev-ref HEAD)
 
-# Merge changes into main and push
-merge_to_main
-
-echo -e "${GREEN}Successfully completed git operations!${NC}"
+echo -e "${GREEN}Successfully pushed changes to test branch. GitHub Actions will handle merging to main.${NC}"

@@ -1,0 +1,50 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - test
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r src/requirements.txt  # Corrected path to requirements.txt
+
+    - name: Run tests
+      run: |
+        pytest src/tests  # Ensure tests are in the correct directory
+
+  create-pull-request:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Create pull request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        branch: test
+        base: main
+        title: "Merge test branch into main"
+        body: |
+          This pull request was created automatically by GitHub Actions.
+          It merges the `test` branch into `main` after successful tests.
+        labels: |
+          automated-pull-request
