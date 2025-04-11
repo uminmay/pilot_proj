@@ -1,6 +1,6 @@
 import pytest
-from ...src.db.models import User, Session  # Fix import path
-from ...src.db import db_session, Base, engine  # Fix import path
+from src.db.models import User, Session  # Use absolute import
+from src.db import db_session, Base, engine  # Use absolute import
 
 @pytest.fixture(scope='session', autouse=True)
 def setup_database():

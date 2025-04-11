@@ -1,5 +1,5 @@
 import pytest
-from ...src.chat.consumers import ChatConsumer  # Fix import path
+from src.chat.consumers import ChatConsumer  # Use absolute import
 
 @pytest.fixture
 def client():

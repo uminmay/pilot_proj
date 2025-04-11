@@ -1,5 +1,5 @@
 import pytest
-from ...src.auth.routes import register_user, login_user  # Fix import path
+from src.auth.routes import register_user, login_user  # Use absolute import
 
 @pytest.fixture
 def client():
