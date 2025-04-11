@@ -27,6 +27,7 @@ check_git_config() {
 }
 
 # Function to check if SSH key exists and is added to ssh-agent
+# Function to check if SSH key exists and is added to ssh-agent
 check_ssh() {
     echo -e "${YELLOW}Checking for existing SSH keys...${NC}"
     local key_files=($(find ~/.ssh -type f -not -name "*.pub" -not -name "known_hosts" -not -name "config"))
@@ -34,42 +35,44 @@ check_ssh() {
     
     if [ $num_keys -gt 0 ]; then
         echo -e "${GREEN}Found existing SSH keys:${NC}"
-        for i in "${!key_files[@]}"; do echo "[$((i+1))] ${key_files[$i]}"; done
-        read -p "Select key number (or 'n' for new key): " selection
+        for i in "${!key_files[@]}"; do 
+            echo "[$((i+1))] ${key_files[$i]}"
+        done
         
-        if [[ $selection =~ ^[0-9]+$ ]] && [ $selection -le $num_keys ] && [ $selection -gt 0 ]]; then
-            selected_key="${key_files[$((selection-1))]}"
-            eval "$(ssh-agent -s)" && ssh-add "$selected_key"
-            return 0
-        elif [[ $selection =~ ^[Nn]$ ]]; then
-            mkdir -p ~/.ssh
-            echo -e "${YELLOW}Generating new SSH key...${NC}"
-            read -p "Enter key name (will be created in ~/.ssh/): " key_name
-            key_name=${key_name:-id_rsa}
-            key_path="$HOME/.ssh/$key_name"
+        while true; do
+            read -p "Select key number (or 'n' for new key): " selection
             
-            if [ -f "$key_path" ]; then
-                echo -e "${RED}Key already exists at $key_path${NC}"
-                return 1
+            if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -le "$num_keys" ] && [ "$selection" -gt 0 ]; then
+                selected_key="${key_files[$((selection-1))]}"
+                echo -e "${GREEN}Using key: $selected_key${NC}"
+                eval "$(ssh-agent -s)" && ssh-add "$selected_key"
+                return 0
+            elif [[ "$selection" =~ ^[Nn]$ ]]; then
+                break
+            else
+                echo -e "${RED}Invalid selection. Please enter a number between 1 and $num_keys or 'n' for new key${NC}"
+                continue
             fi
-            
-            ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$key_path"
-            eval "$(ssh-agent -s)" && ssh-add "$key_path"
-            echo -e "${GREEN}Add this public key to GitHub:${NC}" && cat "${key_path}.pub"
-            read -p "Press enter after adding to GitHub..."
-        else
-            echo -e "${RED}Invalid selection${NC}"
-            return 1
-        fi
-    else
-        echo -e "${YELLOW}No existing SSH keys found in ~/.ssh${NC}"
-        echo -e "${YELLOW}Generating new SSH key...${NC}"
-        mkdir -p ~/.ssh
-        ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$HOME/.ssh/id_rsa"
-        eval "$(ssh-agent -s)" && ssh-add "$HOME/.ssh/id_rsa"
-        echo -e "${GREEN}Add this public key to GitHub:${NC}" && cat "$HOME/.ssh/id_rsa.pub"
-        read -p "Press enter after adding to GitHub..."
+        done
     fi
+    
+    # Create new key
+    mkdir -p ~/.ssh
+    echo -e "${YELLOW}Generating new SSH key...${NC}"
+    read -p "Enter key name (will be created in ~/.ssh/, default: id_rsa): " key_name
+    key_name=${key_name:-id_rsa}
+    key_path="$HOME/.ssh/$key_name"
+    
+    if [ -f "$key_path" ]; then
+        echo -e "${RED}Key already exists at $key_path${NC}"
+        return 1
+    fi
+    
+    ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$key_path"
+    eval "$(ssh-agent -s)" && ssh-add "$key_path"
+    echo -e "${GREEN}Add this public key to GitHub:${NC}"
+    cat "${key_path}.pub"
+    read -p "Press enter after adding to GitHub..."
 }
 
 # Function to check if repository has commits
