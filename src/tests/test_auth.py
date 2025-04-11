@@ -1,5 +1,5 @@
 import pytest
-from src.auth.routes import register_user, login_user
+from ...src.auth.routes import register_user, login_user  # Fix import path
 
 @pytest.fixture
 def client():

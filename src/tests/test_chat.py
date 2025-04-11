@@ -1,10 +1,9 @@
 import pytest
-from chat import consumers
+from ...src.chat.consumers import ChatConsumer  # Fix import path
 
 @pytest.fixture
 def client():
-    # Setup code for creating a test client
-    pass
+    return None  # Mock client for now
 
 def test_chat_connection(client):
     # Test WebSocket connection for chat

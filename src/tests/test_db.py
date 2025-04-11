@@ -1,6 +1,12 @@
 import pytest
-from src.db.models import User, Session  # Assuming these are your models
-from src.db import db_session  # Assuming you have a session management setup
+from ...src.db.models import User, Session  # Fix import path
+from ...src.db import db_session, Base, engine  # Fix import path
+
+@pytest.fixture(scope='session', autouse=True)
+def setup_database():
+    Base.metadata.create_all(engine)
+    yield
+    Base.metadata.drop_all(engine)
 
 @pytest.fixture(scope='module')
 def new_user():

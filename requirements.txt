@@ -1,0 +1,13 @@
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-SocketIO
+psycopg2-binary
+kafka-python
+pytest>=7.0.0
+pytest-flask>=1.2.0
+pytest-cov>=4.0.0
+pytest-pythonpath>=0.7.4
+Flask-JWT-Extended>=4.5.2
+SQLAlchemy>=1.4.0
+channels>=4.0.0
