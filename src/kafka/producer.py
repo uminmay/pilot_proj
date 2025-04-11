@@ -15,3 +15,10 @@ class Producer:
 
     def close(self):
         self.producer.close()
+
+def send_message_to_kafka(message):
+    producer = Producer()
+    try:
+        producer.send_message('chat_messages', message)
+    finally:
+        producer.close()

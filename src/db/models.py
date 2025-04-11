@@ -8,9 +8,18 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    email = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=True)
 
     sessions = relationship("Session", back_populates="user")
+
+    def __init__(self, username, password=None, **kwargs):
+        super(User, self).__init__(**kwargs)
+        self.username = username
+        if password:
+            self.set_password(password)
+
+    def set_password(self, password):
+        self.hashed_password = password  # In production, use proper hashing
 
 class Session(Base):
     __tablename__ = 'sessions'

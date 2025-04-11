@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_socketio import SocketIO, emit
-from ..db.models import ChatMessage
-from ..kafka.producer import send_message_to_kafka
+from src.db.models import ChatMessage
+from src.kafka.producer import send_message_to_kafka
 
 chat_bp = Blueprint('chat', __name__)
 socketio = SocketIO()

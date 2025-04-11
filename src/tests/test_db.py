@@ -19,7 +19,7 @@ def new_user():
 
 def test_user_creation(new_user):
     assert new_user.username == 'testuser'
-    assert new_user.password == 'testpass'
+    assert new_user.hashed_password == 'testpass'  # In production, test hash
 
 def test_session_creation(new_user):
     session = Session(user_id=new_user.id)
