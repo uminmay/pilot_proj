@@ -1,9 +1,11 @@
 from flask import Flask
 from flask_socketio import SocketIO
 from .config import Config
+from .db import db  # Import SQLAlchemy instance
 
 app = Flask(__name__)
 app.config.from_object(Config)
+db.init_app(app)  # Initialize SQLAlchemy
 socketio = SocketIO(app)
 
 # Import routes with correct paths

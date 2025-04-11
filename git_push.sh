@@ -129,7 +129,11 @@ get_commit_message() {
     echo -e "${YELLOW}Summary of changes:${NC}"
     git diff --stat
     read -p "Enter commit message (press enter for timestamp): " commit_message
-    echo "${commit_message:-Update: $(date +%Y-%m-%d_%H-%M-%S)}"
+    if [ -z "$commit_message" ]; then
+        echo "Update: $(date +%Y-%m-%d_%H-%M-%S)"
+    else
+        echo "$commit_message"
+    fi
 }
 
 # Main execution
@@ -164,7 +168,7 @@ if [ $is_first_push -eq 0 ]; then
     git pull origin $(git rev-parse --abbrev-ref HEAD)
 fi
 
-commit_message=$(get_commit_message)
+commit_message="$(get_commit_message)"
 git add .
 git commit -m "$commit_message"
 
