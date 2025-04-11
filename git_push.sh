@@ -28,7 +28,7 @@ check_git_config() {
 
 # Function to check if SSH key exists and is added to ssh-agent
 check_ssh() {
-    echo -e "${YELLOW}Checking for existing SSH keys...${NC}"
+    echo -e "${RED}SSH connectivity failed. Proceeding to key selection or generation...${NC}"
     local key_files=($(find ~/.ssh -type f -not -name "*.pub" -not -name "known_hosts" -not -name "config"))
     local num_keys=${#key_files[@]}
     
@@ -80,9 +80,10 @@ test_connectivity() {
     git ls-remote &>/dev/null
     if [ $? -ne 0 ]; then
         echo -e "${RED}Authentication error detected. Proceeding to key selection or generation...${NC}"
-        handle_auth_error
+        return 1
     else
         echo -e "${GREEN}Connectivity test successful. Proceeding with git operations...${NC}"
+        return 0
     fi
 }
 
@@ -174,6 +175,19 @@ get_commit_message() {
     echo "${commit_message:-Update: $(date +%Y-%m-%d_%H-%M-%S)}"
 }
 
+# Function to merge changes into main and push
+merge_to_main() {
+    echo -e "${YELLOW}Checking out main branch...${NC}"
+    git checkout main 2>/dev/null || git checkout -b main
+    echo -e "${GREEN}Merging changes from $(git rev-parse --abbrev-ref HEAD) into main...${NC}"
+    git merge --no-ff -m "Merge changes from $(git rev-parse --abbrev-ref HEAD)" || {
+        echo -e "${RED}Merge conflict detected. Resolve conflicts and push manually.${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}Pushing changes to main branch...${NC}"
+    git push origin main
+}
+
 # Main execution
 echo -e "${GREEN}Starting Git automation...${NC}"
 
@@ -182,9 +196,11 @@ command -v git >/dev/null 2>&1 || { echo -e "${RED}Install git first${NC}"; exit
 check_git_config
 
 # Test connectivity before proceeding
-test_connectivity
-
-check_ssh
+if test_connectivity; then
+    echo -e "${GREEN}Skipping SSH key check as connectivity is successful.${NC}"
+else
+    check_ssh
+fi
 
 # Initialize git and check first push
 init_git
@@ -197,7 +213,8 @@ if ! has_commits; then
     echo -e "${YELLOW}Creating initial commit...${NC}"
     git add .
     git commit -m "Initial commit"
-    git push --set-upstream origin test
+    git push --set-upstream origin $(git rev-parse --abbrev-ref HEAD)
+    merge_to_main
     echo -e "${GREEN}Repository initialized successfully!${NC}"
     exit 0
 fi
@@ -214,7 +231,10 @@ commit_message=$(get_commit_message)
 git add .
 git commit -m "$commit_message"
 
-echo -e "${GREEN}Pushing changes...${NC}"
+echo -e "${GREEN}Pushing changes to branch $(git rev-parse --abbrev-ref HEAD)...${NC}"
 git push origin $(git rev-parse --abbrev-ref HEAD)
+
+# Merge changes into main and push
+merge_to_main
 
 echo -e "${GREEN}Successfully completed git operations!${NC}"
