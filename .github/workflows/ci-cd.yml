@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - test
-      - main # Add more branches if needed
+      - main 
   pull_request: # Trigger on pull requests as well
     branches:
       - test
