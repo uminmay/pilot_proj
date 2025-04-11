@@ -27,7 +27,6 @@ check_git_config() {
 }
 
 # Function to check if SSH key exists and is added to ssh-agent
-# Function to check if SSH key exists and is added to ssh-agent
 check_ssh() {
     echo -e "${YELLOW}Checking for existing SSH keys...${NC}"
     local key_files=($(find ~/.ssh -type f -not -name "*.pub" -not -name "known_hosts" -not -name "config"))
@@ -73,6 +72,49 @@ check_ssh() {
     echo -e "${GREEN}Add this public key to GitHub:${NC}"
     cat "${key_path}.pub"
     read -p "Press enter after adding to GitHub..."
+}
+
+# Function to test connectivity with the remote URL
+test_connectivity() {
+    echo -e "${YELLOW}Testing connectivity with the remote URL...${NC}"
+    git ls-remote &>/dev/null
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Authentication error detected. Proceeding to key selection or generation...${NC}"
+        handle_auth_error
+    else
+        echo -e "${GREEN}Connectivity test successful. Proceeding with git operations...${NC}"
+    fi
+}
+
+# Function to handle authentication error
+handle_auth_error() {
+    echo -e "${YELLOW}Do you want to select an existing SSH key or generate a new one? (select/generate)${NC}"
+    read choice
+    if [ "$choice" == "select" ]; then
+        check_ssh
+    elif [ "$choice" == "generate" ]; then
+        mkdir -p ~/.ssh
+        echo -e "${YELLOW}Generating new SSH key...${NC}"
+        read -p "Enter key name (will be created in ~/.ssh/, default: id_rsa): " key_name
+        key_name=${key_name:-id_rsa}
+        key_path="$HOME/.ssh/$key_name"
+        
+        if [ -f "$key_path" ]; then
+            echo -e "${RED}Key already exists at $key_path${NC}"
+            return 1
+        fi
+        
+        ssh-keygen -t rsa -b 4096 -C "$(git config user.email)" -f "$key_path"
+        eval "$(ssh-agent -s)" && ssh-add "$key_path"
+        echo -e "${GREEN}Add this public key to GitHub:${NC}"
+        cat "${key_path}.pub"
+        read -p "Press enter after adding to GitHub..."
+    else
+        echo -e "${RED}Invalid choice. Exiting.${NC}"
+        exit 1
+    fi
+    echo -e "${YELLOW}Retrying connectivity test...${NC}"
+    test_connectivity
 }
 
 # Function to check if repository has commits
@@ -138,6 +180,10 @@ echo -e "${GREEN}Starting Git automation...${NC}"
 # Initial checks
 command -v git >/dev/null 2>&1 || { echo -e "${RED}Install git first${NC}"; exit 1; }
 check_git_config
+
+# Test connectivity before proceeding
+test_connectivity
+
 check_ssh
 
 # Initialize git and check first push
