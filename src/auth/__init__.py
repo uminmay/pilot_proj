@@ -1,0 +1,1 @@
+# The file /chat-app/chat-app/src/auth/__init__.py is intentionally left blank.
